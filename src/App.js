@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { db } from "./firebaseConnection";
+import { db, auth } from "./firebaseConnection";
 import {
     doc,
     setDoc,
@@ -12,12 +12,25 @@ import {
     onSnapshot,
 } from "firebase/firestore";
 
+import {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut,
+} from "firebase/auth";
+
 import "./app.css";
 
 function App() {
     const [titulo, setTitulo] = useState("");
     const [autor, setAutor] = useState("");
     const [idPost, setIdPost] = useState("");
+
+    const [email, setEmail] = useState("");
+    const [senha, setSenha] = useState("");
+
+    const [user, setUser] = useState(false);
+    const [userDetail, setUserDetail] = useState([]);
+
     const [posts, setPosts] = useState([]);
 
     useEffect(() => {
@@ -95,19 +108,93 @@ function App() {
     async function excluirPost(id) {
         const docRef = doc(db, "posts", id);
 
-        await deleteDoc(docRef)
-            .then(() => {
-                alert("Excluído com sucesso!");
-                buscarPost();
+        await deleteDoc(docRef).then(() => {
+            alert("Excluído com sucesso!");
+            buscarPost();
+        });
+    }
+
+    async function novoUsuario() {
+        await createUserWithEmailAndPassword(auth, email, senha)
+            .then((value) => {
+                alert("Usuário cadastrado com sucesso!");
+                setEmail("");
+                setSenha("");
             })
             .catch((error) => {
-                console.log("Erro ao excluir: " + error);
+                if (error.code === "auth/weak-password") {
+                    alert("Senha muito fraca.");
+                } else if (error.code === "auth/email-already-in-use") {
+                    alert("Email já cadastrado.");
+                }
             });
+    }
+
+    async function logarUsuario() {
+        await signInWithEmailAndPassword(auth, email, senha)
+            .then((value) => {
+                alert("Bem vindo(a): " + value.user.email);
+
+                setUserDetail({
+                    uid: value.user.uid,
+                    email: value.user.email,
+                });
+                setUser(true);
+                setEmail("");
+                setSenha("");
+            })
+
+            .catch((error) => {
+                if (error.code === "auth/wrong-password") {
+                    alert("Senha incorreta.");
+                } else if (error.code === "auth/user-not-found") {
+                    alert("Usuário não encontrado.");
+                } else {
+                    alert("Erro ao tentar logar: " + error.code);
+                }
+            });
+    }
+
+    async function fazerLogout() {
+        await signOut(auth);
+        setUser(false);
+        setUserDetail({});
+        alert("Você saiu da aplicação!");
     }
 
     return (
         <div className="App">
             <h1>Anotações com Firbebase</h1>
+
+            {user && (
+                <div>
+                    <strong>Seja bem vindo(a): {userDetail.uid} </strong> <br />
+                    <button onClick={fazerLogout}>Sair</button> <br />
+                </div>
+            )}
+
+            <div className="container">
+                <h2>Usuario</h2>
+                <label>Email</label>
+                <input
+                    placeholder="Digite seu email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                />{" "}
+                <br />
+                <label>Senha</label>
+                <input
+                    placeholder="Digite sua senha"
+                    value={senha}
+                    onChange={(e) => setSenha(e.target.value)}
+                />{" "}
+                <br />
+                <button onClick={novoUsuario}>Cadastrar</button> <br />
+                <button onClick={logarUsuario}>Login</button>
+            </div>
+            <br />
+            <br />
+            <hr />
 
             <div className="container">
                 <label> ID POST</label>
